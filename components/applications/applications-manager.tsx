@@ -2,8 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 import type { Application, ApplicationStatus } from "@/types/application";
+import PageHeader from "@/components/layout/page-header";
+import EmptyState from "@/components/ui/empty-state";
+
+const supabase = createClient();
 
 type ApplicationForm = {
   company_name: string;
@@ -12,11 +16,10 @@ type ApplicationForm = {
   status: ApplicationStatus;
   application_date: string;
   deadline: string;
+  interview_date: string;
+  prep_status: string;
   job_link: string;
   notes: string;
-  resume_version: string;
-  jd_text: string;
-  follow_up_date: string;
 };
 
 const EMPTY_FORM: ApplicationForm = {
@@ -26,11 +29,10 @@ const EMPTY_FORM: ApplicationForm = {
   status: "Applied",
   application_date: "",
   deadline: "",
+  interview_date: "",
+  prep_status: "Not Started",
   job_link: "",
   notes: "",
-  resume_version: "",
-  jd_text: "",
-  follow_up_date: "",
 };
 
 const STATUS_OPTIONS: ApplicationStatus[] = [
@@ -42,9 +44,22 @@ const STATUS_OPTIONS: ApplicationStatus[] = [
   "Rejected",
 ];
 
+const PREP_STATUS_OPTIONS = [
+  "Not Started",
+  "In Progress",
+  "Ready",
+  "Completed",
+];
+
 function formatDate(value: string | null) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString();
+}
+
+function isOverdue(deadline: string | null, status: ApplicationStatus) {
+  if (!deadline) return false;
+  if (status === "Offer" || status === "Rejected") return false;
+  return new Date(deadline).getTime() < Date.now();
 }
 
 export default function ApplicationsManager() {
@@ -56,6 +71,11 @@ export default function ApplicationsManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [form, setForm] = useState<ApplicationForm>(EMPTY_FORM);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"All" | ApplicationStatus>("All");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "deadline" | "company">(
+    "newest"
+  );
 
   const loadApplications = async (uid: string) => {
     const { data, error } = await supabase
@@ -100,9 +120,48 @@ export default function ApplicationsManager() {
     return { total, applied, interviews, offers };
   }, [items]);
 
+  const visibleItems = useMemo(() => {
+    const search = searchQuery.trim().toLowerCase();
+    let result = [...items];
+
+    if (search) {
+      result = result.filter((item) =>
+        [item.company_name, item.role_title, item.location ?? "", item.notes ?? ""]
+          .join(" ")
+          .toLowerCase()
+          .includes(search)
+      );
+    }
+
+    if (statusFilter !== "All") {
+      result = result.filter((item) => item.status === statusFilter);
+    }
+
+    result.sort((a, b) => {
+      if (sortBy === "company") {
+        return a.company_name.localeCompare(b.company_name);
+      }
+
+      if (sortBy === "deadline") {
+        const aDate = a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+        const bDate = b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+        return aDate - bDate;
+      }
+
+      if (sortBy === "oldest") {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      }
+
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    return result;
+  }, [items, searchQuery, statusFilter, sortBy]);
+
   const resetForm = () => {
     setForm(EMPTY_FORM);
     setEditingId(null);
+    setError("");
   };
 
   const handleEdit = (item: Application) => {
@@ -114,12 +173,12 @@ export default function ApplicationsManager() {
       status: item.status,
       application_date: item.application_date ?? "",
       deadline: item.deadline ?? "",
+      interview_date: item.interview_date ?? "",
+      prep_status: item.prep_status ?? "Not Started",
       job_link: item.job_link ?? "",
       notes: item.notes ?? "",
-      resume_version: item.resume_version ?? "",
-      jd_text: item.jd_text ?? "",
-      follow_up_date: item.follow_up_date ?? "",
     });
+    setError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -130,6 +189,7 @@ export default function ApplicationsManager() {
     if (!ok) return;
 
     setError("");
+
     const { error } = await supabase
       .from("applications")
       .delete()
@@ -159,15 +219,14 @@ export default function ApplicationsManager() {
       status: form.status,
       application_date: form.application_date || null,
       deadline: form.deadline || null,
+      interview_date: form.interview_date || null,
+      prep_status: form.prep_status,
       job_link: form.job_link.trim() || null,
       notes: form.notes.trim() || null,
-      resume_version: form.resume_version.trim() || null,
-      jd_text: form.jd_text.trim() || null,
-      follow_up_date: form.follow_up_date || null,
       updated_at: new Date().toISOString(),
     };
 
-    let responseError = null;
+    let responseError: { message: string } | null = null;
 
     if (editingId) {
       const { error } = await supabase
@@ -203,20 +262,51 @@ export default function ApplicationsManager() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
-          <h1 className="text-3xl font-bold">Applications</h1>
-          <p className="mt-2 text-muted-foreground">
-            Add, edit, and manage every internship/job application in one place.
-          </p>
-        </div>
+      <PageHeader
+        title="Applications"
+        description="Add, edit, and manage every internship and job application in one place."
+        actions={
+          <button
+            type="button"
+            onClick={resetForm}
+            className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-muted"
+          >
+            New Application
+          </button>
+        }
+      />
 
+      <div className="mt-8 grid gap-4 md:grid-cols-4">
+        <InputField
+          label="Search"
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search company, role, notes..."
+        />
+        <SelectField
+          label="Status"
+          value={statusFilter}
+          options={["All", "Wishlist", "Applied", "OA", "Interview", "Offer", "Rejected"]}
+          onChange={(value) => setStatusFilter(value as "All" | ApplicationStatus)}
+        />
+        <SelectField
+          label="Sort by"
+          value={sortBy}
+          options={["newest", "oldest", "deadline", "company"]}
+          onChange={(value) =>
+            setSortBy(value as "newest" | "oldest" | "deadline" | "company")
+          }
+        />
         <button
           type="button"
-          onClick={resetForm}
-          className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-muted"
+          onClick={() => {
+            setSearchQuery("");
+            setStatusFilter("All");
+            setSortBy("newest");
+          }}
+          className="mt-7 h-[48px] rounded-xl border px-4 py-3 text-sm font-medium hover:bg-muted"
         >
-          New Application
+          Clear Filters
         </button>
       </div>
 
@@ -235,6 +325,7 @@ export default function ApplicationsManager() {
           <h2 className="text-xl font-semibold">
             {editingId ? "Edit Application" : "Add Application"}
           </h2>
+
           {editingId && (
             <button
               type="button"
@@ -261,6 +352,7 @@ export default function ApplicationsManager() {
             }
             placeholder="Google"
           />
+
           <InputField
             label="Role Title"
             value={form.role_title}
@@ -269,12 +361,34 @@ export default function ApplicationsManager() {
             }
             placeholder="Software Engineering Intern"
           />
+
           <InputField
             label="Location"
             value={form.location}
-            onChange={(value) => setForm((prev) => ({ ...prev, location: value }))}
+            onChange={(value) =>
+              setForm((prev) => ({ ...prev, location: value }))
+            }
             placeholder="Remote"
           />
+
+          <SelectField
+            label="Prep Status"
+            value={form.prep_status}
+            options={PREP_STATUS_OPTIONS}
+            onChange={(value) =>
+              setForm((prev) => ({ ...prev, prep_status: value }))
+            }
+          />
+
+          <InputField
+            label="Interview Date"
+            type="date"
+            value={form.interview_date}
+            onChange={(value) =>
+              setForm((prev) => ({ ...prev, interview_date: value }))
+            }
+          />
+
           <SelectField
             label="Status"
             value={form.status}
@@ -283,6 +397,7 @@ export default function ApplicationsManager() {
               setForm((prev) => ({ ...prev, status: value as ApplicationStatus }))
             }
           />
+
           <InputField
             label="Application Date"
             type="date"
@@ -291,48 +406,33 @@ export default function ApplicationsManager() {
               setForm((prev) => ({ ...prev, application_date: value }))
             }
           />
+
           <InputField
             label="Deadline"
             type="date"
             value={form.deadline}
-            onChange={(value) => setForm((prev) => ({ ...prev, deadline: value }))}
+            onChange={(value) =>
+              setForm((prev) => ({ ...prev, deadline: value }))
+            }
           />
+
           <InputField
             label="Job Link"
             value={form.job_link}
-            onChange={(value) => setForm((prev) => ({ ...prev, job_link: value }))}
+            onChange={(value) =>
+              setForm((prev) => ({ ...prev, job_link: value }))
+            }
             placeholder="https://..."
           />
-          <InputField
-            label="Resume Version"
-            value={form.resume_version}
-            onChange={(value) =>
-              setForm((prev) => ({ ...prev, resume_version: value }))
-            }
-            placeholder="resume_v3.pdf"
-          />
-          <InputField
-            label="Follow-up Date"
-            type="date"
-            value={form.follow_up_date}
-            onChange={(value) =>
-              setForm((prev) => ({ ...prev, follow_up_date: value }))
-            }
-          />
+
           <div className="md:col-span-2">
             <TextAreaField
               label="Notes"
               value={form.notes}
-              onChange={(value) => setForm((prev) => ({ ...prev, notes: value }))}
-              placeholder="Referral info, interview prep notes, application status..."
-            />
-          </div>
-          <div className="md:col-span-2">
-            <TextAreaField
-              label="Job Description / Keywords"
-              value={form.jd_text}
-              onChange={(value) => setForm((prev) => ({ ...prev, jd_text: value }))}
-              placeholder="Paste the JD here if you want to analyze it later..."
+              onChange={(value) =>
+                setForm((prev) => ({ ...prev, notes: value }))
+              }
+              placeholder="Application notes, interview prep, referral info..."
             />
           </div>
         </div>
@@ -351,13 +451,14 @@ export default function ApplicationsManager() {
           <h2 className="text-xl font-semibold">Saved Applications</h2>
         </div>
 
-        {items.length === 0 ? (
-          <div className="rounded-2xl border p-8 text-center text-muted-foreground">
-            No applications yet. Add your first one above.
-          </div>
+        {visibleItems.length === 0 ? (
+          <EmptyState
+            title="No applications found"
+            description="Try another search term or clear the filters."
+          />
         ) : (
           <div className="grid gap-4">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <article
                 key={item.id}
                 className="rounded-2xl border bg-card p-5 shadow-sm"
@@ -365,27 +466,38 @@ export default function ApplicationsManager() {
                 <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <h3 className="text-lg font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/applications/${item.id}`)}
+                        className="text-lg font-semibold hover:underline"
+                      >
                         {item.company_name}
-                      </h3>
+                      </button>
+
                       <span className="rounded-full border px-3 py-1 text-xs">
                         {item.status}
                       </span>
+
+                      {isOverdue(item.deadline, item.status) && (
+                        <span className="rounded-full border border-red-300 px-3 py-1 text-xs text-red-600">
+                          Overdue
+                        </span>
+                      )}
                     </div>
+
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {item.role_title} {item.location ? `• ${item.location}` : ""}
+                      {item.role_title}
+                      {item.location ? ` • ${item.location}` : ""}
                     </p>
 
                     <div className="mt-3 grid gap-1 text-sm text-muted-foreground">
                       <p>Applied on: {formatDate(item.application_date)}</p>
                       <p>Deadline: {formatDate(item.deadline)}</p>
-                      <p>Follow-up: {formatDate(item.follow_up_date)}</p>
-                      <p>Resume: {item.resume_version || "-"}</p>
+                      <p>Interview date: {formatDate(item.interview_date ?? null)}</p>
+                      <p>Prep status: {item.prep_status || "Not Started"}</p>
                     </div>
 
-                    {item.notes && (
-                      <p className="mt-3 text-sm">{item.notes}</p>
-                    )}
+                    {item.notes && <p className="mt-3 text-sm">{item.notes}</p>}
                   </div>
 
                   <div className="flex gap-2">

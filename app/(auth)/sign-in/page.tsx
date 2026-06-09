@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
+
+const supabase = createClient();
 
 export default function SignInPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -17,13 +20,10 @@ export default function SignInPage() {
     setLoading(true);
     setError("");
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-  email,
-  password,
-});
-
-console.log("SIGN IN DATA:", data);
-console.log("SIGN IN ERROR:", error);
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
     if (error) {
       setError(error.message);
@@ -35,6 +35,23 @@ console.log("SIGN IN ERROR:", error);
     router.push("/dashboard");
   };
 
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    setError("");
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      setError(error.message);
+      setGoogleLoading(false);
+    }
+  };
+
   return (
     <main className="mx-auto flex min-h-screen max-w-md items-center px-6">
       <div className="w-full rounded-2xl border p-6 shadow-sm">
@@ -43,7 +60,22 @@ console.log("SIGN IN ERROR:", error);
           Sign in to manage your applications and reminders.
         </p>
 
-        <form onSubmit={handleSignIn} className="mt-6 space-y-4">
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={googleLoading}
+          className="mt-6 w-full rounded-xl border px-4 py-3 font-medium hover:bg-muted disabled:opacity-60"
+        >
+          {googleLoading ? "Connecting..." : "Continue with Google"}
+        </button>
+
+        <div className="my-6 flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs text-muted-foreground">OR</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
+        <form onSubmit={handleSignIn} className="space-y-4">
           <input
             type="email"
             placeholder="Email"
@@ -70,12 +102,14 @@ console.log("SIGN IN ERROR:", error);
           </button>
         </form>
 
-        <p className="mt-4 text-sm text-muted-foreground">
-          New here?{" "}
-          <Link href="/sign-up" className="underline">
-            Create an account
+        <div className="mt-4 flex items-center justify-between text-sm">
+          <Link href="/forgot-password" className="underline">
+            Forgot password?
           </Link>
-        </p>
+          <Link href="/sign-up" className="underline">
+            Create account
+          </Link>
+        </div>
       </div>
     </main>
   );

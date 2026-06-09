@@ -20,6 +20,11 @@ export interface Application {
   resume_version: string | null;
   jd_text: string | null;
   follow_up_date: string | null;
+  company_website?: string | null;
+  referral_name?: string | null;
+  interview_date?: string | null;
+  next_follow_up_date?: string | null;
+  prep_status?: string | null;
   created_at: string;
   updated_at?: string;
 }
