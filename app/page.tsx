@@ -4,53 +4,63 @@ import { ArrowRight, Bell, BarChart3, KanbanSquare } from "lucide-react";
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col justify-center px-6 py-16">
-        <div className="max-w-3xl">
-          <p className="mb-4 inline-flex rounded-full border px-4 py-1 text-sm">
-            Smart Internship & Job Tracker
-          </p>
+      <section className="mx-auto max-w-5xl px-6 py-10">
+        <div className="border-b pb-4 text-sm">
+          Job Tracker
+        </div>
 
-          <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-            Track applications, reminders, interviews, and analytics in one place.
-          </h1>
+        <div className="mt-12 grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+          <div>
+            <h1 className="max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
+              Keep track of applications, reminders, and interview updates.
+            </h1>
 
-          <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
-            A polished job tracker with pipeline management, deadline reminders,
-            resume tracking, and analytics built for internship preparation.
-          </p>
+            <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground">
+              A simple app for students to manage job applications, follow-ups, and interview prep in one place.
+            </p>
 
-          <div className="mt-8 flex flex-wrap gap-4">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-xl bg-black px-5 py-3 text-white transition hover:opacity-90"
-            >
-              Open Dashboard <ArrowRight className="h-4 w-4" />
-            </Link>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 border px-4 py-2 text-sm font-medium hover:bg-muted"
+              >
+                Open Dashboard <ArrowRight className="h-4 w-4" />
+              </Link>
 
-            <Link
-              href="/applications"
-              className="inline-flex items-center gap-2 rounded-xl border px-5 py-3 transition hover:bg-muted"
-            >
-              View Applications
-            </Link>
+              <Link
+                href="/applications"
+                className="inline-flex items-center gap-2 border px-4 py-2 text-sm font-medium hover:bg-muted"
+              >
+                View Applications
+              </Link>
+            </div>
+
+            <div className="mt-10 border-t pt-6">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <MiniItem icon={<KanbanSquare className="h-4 w-4" />} text="Pipeline" />
+                <MiniItem icon={<Bell className="h-4 w-4" />} text="Reminders" />
+                <MiniItem icon={<BarChart3 className="h-4 w-4" />} text="Analytics" />
+              </div>
+            </div>
           </div>
 
-          <div className="mt-12 grid gap-4 md:grid-cols-3">
-            <FeatureCard
-              icon={<KanbanSquare className="h-5 w-5" />}
-              title="Pipeline board"
-              description="Move applications through Applied, OA, Interview, Offer, and Rejected."
-            />
-            <FeatureCard
-              icon={<Bell className="h-5 w-5" />}
-              title="Smart reminders"
-              description="Get reminders for deadlines, follow-ups, and interview dates."
-            />
-            <FeatureCard
-              icon={<BarChart3 className="h-5 w-5" />}
-              title="Analytics"
-              description="See conversion rates, stage-wise progress, and monthly trends."
-            />
+          <div className="border p-5">
+            <h2 className="text-base font-semibold">What the app does</h2>
+
+            <div className="mt-5 space-y-4">
+              <PlainItem
+                title="Applications"
+                description="Add and edit company, role, deadline, and notes."
+              />
+              <PlainItem
+                title="Pipeline"
+                description="Move applications through Applied, OA, Interview, Offer, and Rejected."
+              />
+              <PlainItem
+                title="Reminders"
+                description="Set deadline and follow-up reminders, with WhatsApp support."
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -58,20 +68,34 @@ export default function HomePage() {
   );
 }
 
-function FeatureCard({
+function MiniItem({
   icon,
+  text,
+}: {
+  icon: React.ReactNode;
+  text: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 border px-3 py-2 text-sm">
+      <span>{icon}</span>
+      <span>{text}</span>
+    </div>
+  );
+}
+
+function PlainItem({
   title,
   description,
 }: {
-  icon: React.ReactNode;
   title: string;
   description: string;
 }) {
   return (
-    <div className="rounded-2xl border bg-card p-5 shadow-sm">
-      <div className="mb-3 inline-flex rounded-xl border p-2">{icon}</div>
-      <h3 className="text-lg font-semibold">{title}</h3>
-      <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+    <div className="border-b pb-3 last:border-b-0 last:pb-0">
+      <h3 className="font-medium">{title}</h3>
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+        {description}
+      </p>
     </div>
   );
 }
